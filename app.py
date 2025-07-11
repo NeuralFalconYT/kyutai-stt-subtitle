@@ -179,7 +179,8 @@ def ensure_mono(audio_path: str) -> str:
 
         # print(f"⚠️ Audio is stereo (channels={channels}), converting to mono MP3...")
 
-        base, _ = os.path.splitext(os.path.basename(audio_path))[0]
+        base = os.path.splitext(os.path.basename(audio_path))[0]
+
         mono_path = f"./subtitle/{base}_mono.mp3"
 
         # Remove stale output if exists
@@ -378,34 +379,37 @@ def write_sentence_srt(
     # print(f"SRT file '{output_file}' created with orphan-merging logic.")
 
 
-def srt_making(upload_file):
-    root_path="./subtitle"
+def srt_making(upload_file, model_name="kyutai/stt-2.6b-en"):
+    root_path = "./subtitle"
     os.makedirs(root_path, exist_ok=True)
-    model = load_model(device="cuda")
+
+    model = load_model(hf_repo=model_name, device="cuda")
+
     if upload_file.endswith(".mp4"):
-      mono_audio_path = convert_video_to_mono_mp3(upload_file)
+        mono_audio_path = convert_video_to_mono_mp3(upload_file)
     else:
-      mono_audio_path = ensure_mono(upload_file)
-    base=os.path.splitext(os.path.basename(upload_file))[0]
-    save_json_path=f"{root_path}/{base}_word.json"
-    word_srt_path =f"{root_path}/{base}_word.srt"
-    sentence_srt_path=f"{root_path}/{base}_sentence.srt"
-    text_path=f"{root_path}/{base}_text.txt"
-    transcription, word_level_timestamps = run_transcription(model, mono_audio_path,save_json_path)
-    unload_model(model)
-    write_word_srt(word_level_timestamps, output_file=word_srt_path, skip_punctuation=True)
-    write_sentence_srt(
-    word_level_timestamps,
-    output_file=sentence_srt_path,
-    max_lines=2,
-    max_duration_s=7.0,
-    max_chars_per_line=38,
-    hard_pause_threshold=0.5,
-    merge_pause_threshold=0.4
+        mono_audio_path = ensure_mono(upload_file)
+
+    base = os.path.splitext(os.path.basename(upload_file))[0]
+    save_json_path = f"{root_path}/{base}_word.json"
+    word_srt_path = f"{root_path}/{base}_word.srt"
+    sentence_srt_path = f"{root_path}/{base}_sentence.srt"
+    text_path = f"{root_path}/{base}_text.txt"
+
+    transcription, word_level_timestamps = run_transcription(
+        model, mono_audio_path, save_json_path
     )
+
+    unload_model(model)
+
+    write_word_srt(word_level_timestamps, output_file=word_srt_path, skip_punctuation=True)
+    write_sentence_srt(word_level_timestamps, output_file=sentence_srt_path)
+
     with open(text_path, "w", encoding="utf-8") as f:
         f.write(transcription)
-    return sentence_srt_path,word_srt_path,save_json_path,text_path,transcription
+
+    return sentence_srt_path, word_srt_path, save_json_path, text_path, transcription
+
 
 
 
@@ -426,30 +430,36 @@ import gradio as gr
 def ui():
     with gr.Blocks() as demo:
         gr.Markdown("<center><h1 style='font-size: 40px;'>Kyutai STT Subtitle Generation</h1></center>")  
+
         with gr.Row():
             with gr.Column():
                 file_upload = gr.File(label='Upload Audio or Video File')
+                model_dropdown = gr.Dropdown(
+                    label="Choose Model",
+                    choices=["kyutai/stt-1b-en_fr", "kyutai/stt-2.6b-en"],
+                    value="kyutai/stt-1b-en_fr"  # Default
+                )
                 with gr.Row():
                     generate_btn = gr.Button('🚀 Generate', variant='primary')
+
             with gr.Column():
                 sentence_srt_path = gr.File(label='📜 Download Sentence-Level SRT')
                 with gr.Accordion('Others', open=False):
                     word_srt_path = gr.File(label='Download Word-Level SRT')
                     save_json_path = gr.File(label='Download Raw Timestamp JSON')
                     text_path = gr.File(label='Download Transcription as Text File')
-                    transcription = gr.Textbox(label='Transcription',lines=3)
+                    transcription = gr.Textbox(label='Transcription', lines=3)
 
-        # Define inputs and outputs
-        inputs = [file_upload]
+        # Updated inputs to include model selection
+        inputs = [file_upload, model_dropdown]
         outputs = [sentence_srt_path, word_srt_path, save_json_path, text_path, transcription]
 
-        # Only use the button to trigger the function
         generate_btn.click(srt_making, inputs=inputs, outputs=outputs)
 
-        # Example input
         gr.Examples(examples=["./sample_fr_hibiki_crepes.mp3"], inputs=[file_upload])
 
     return demo
+
 import click
 @click.command()
 @click.option("--debug", is_flag=True, default=False, help="Enable debug mode.")
