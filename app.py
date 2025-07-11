@@ -437,7 +437,7 @@ def ui():
                     word_srt_path = gr.File(label='Download Word-Level SRT')
                     save_json_path = gr.File(label='Download Raw Timestamp JSON')
                     text_path = gr.File(label='Download Transcription as Text File')
-                    transcription = gr.Textbox(label='Transcription')
+                    transcription = gr.Textbox(label='Transcription',lines=3)
 
         # Define inputs and outputs
         inputs = [file_upload]
