@@ -447,7 +447,7 @@ def ui():
         generate_btn.click(srt_making, inputs=inputs, outputs=outputs)
 
         # Example input
-        gr.Examples(examples=["/content/sample_fr_hibiki_crepes.mp3"], inputs=[file_upload])
+        gr.Examples(examples=["./sample_fr_hibiki_crepes.mp3"], inputs=[file_upload])
 
     return demo
 import click
