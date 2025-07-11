@@ -263,6 +263,9 @@ def write_word_srt(word_level_timestamps, output_file="word.srt", skip_punctuati
             f.write(f"{index}\n{start_srt} --> {end_srt}\n{word}\n\n")
             index += 1  # Increment subtitle number
 
+
+
+
 def split_line_by_char_limit(text, max_chars_per_line=38):
     """
     Formats a text block into lines with a maximum character limit.
@@ -282,6 +285,54 @@ def split_line_by_char_limit(text, max_chars_per_line=38):
     if current_line:
         lines.append(current_line)
     return lines
+
+import re
+
+
+def merge_punctuation_glitches(subtitles):
+    """
+    Adjusts punctuation at subtitle boundaries.
+    - Moves punctuation from the start of a subtitle to the end of the previous one.
+    - Removes awkward solo punctuation subtitles.
+    - Removes all quotes and unwanted characters cleanly.
+    """
+    cleaned = [subtitles[0]]
+    for i in range(1, len(subtitles)):
+        prev = cleaned[-1]
+        curr = subtitles[i]
+
+        prev_text = prev["text"].rstrip()
+        curr_text = curr["text"].lstrip()
+
+        # 1. Move leading punctuation from current to previous
+        match = re.match(r'^([,.:;!?]+)(\s*)(.+)', curr_text)
+        if match:
+            punct, _, rest = match.groups()
+            if not prev_text.endswith(punct):
+                prev["text"] = prev_text + punct
+            curr_text = rest.strip()
+
+        # 2. Clean unwanted characters like quotes, colons, semicolons
+        unwanted_chars = ['"', '“', '”', ';', ':']
+        for ch in unwanted_chars:
+            curr_text = curr_text.replace(ch, '')
+        curr_text = curr_text.strip()
+
+        # 3. Skip subtitle if it’s just punctuation or now empty
+        if not curr_text or re.fullmatch(r'[.,!?]+', curr_text):
+            # Extend end time of previous to cover this orphaned punctuation
+            prev["end"] = curr["end"]
+            continue
+
+        # 4. Apply cleaned text back
+        curr["text"] = curr_text
+        prev["text"] = prev["text"].replace('"', '').replace('“', '').replace('”', '')
+
+        cleaned.append(curr)
+
+    return cleaned
+
+
 
 
 def write_sentence_srt(
@@ -362,7 +413,7 @@ def write_sentence_srt(
 
         # If not merged, just add the current subtitle as is
         final_subtitles.append(current_sub)
-
+    final_subtitles = merge_punctuation_glitches(final_subtitles)
     # --- Write the final, polished SRT file ---
     def format_srt_time(seconds):
         h, m, s, ms = int(seconds//3600), int((seconds%3600)//60), int(seconds%60), int((seconds%1)*1000)
@@ -377,6 +428,8 @@ def write_sentence_srt(
             f.write("\n".join(formatted_lines) + "\n\n")
 
     # print(f"SRT file '{output_file}' created with orphan-merging logic.")
+
+
 
 
 def srt_making(upload_file, model_name="kyutai/stt-2.6b-en"):
