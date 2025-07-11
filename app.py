@@ -174,7 +174,7 @@ def ensure_mono(audio_path: str) -> str:
             channels = f.channels
 
         if channels == 1:
-            print(f"✅ Audio is already mono: {audio_path}")
+            # print(f"✅ Audio is already mono: {audio_path}")
             return audio_path
 
         # print(f"⚠️ Audio is stereo (channels={channels}), converting to mono MP3...")
